@@ -66,3 +66,8 @@ jobs:
       - name: Build for F-Droid
         run: |
           ./gradlew assembleFossDebug
+      - name: Upload APK as artifact   # 👈 新增这一步
+        uses: actions/upload-artifact@v4
+        with:
+          name: antimine-foss-debug
+          path: app/build/outputs/apk/foss/debug/*.apk
