@@ -1,9 +1,15 @@
 name: Android CI
 
+# on:
+#   pull_request:
+#     branches:
+#       - main
 on:
+  push:
+    branches: [ main ]          # 每次 push 到 main 分支时运行
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch: 
 
 jobs:
   libgdx:
