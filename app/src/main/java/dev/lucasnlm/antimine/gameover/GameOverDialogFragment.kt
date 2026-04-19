@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.text.format.DateUtils
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.WindowManager
@@ -13,7 +12,6 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import dev.lucasnlm.antimine.R
 import dev.lucasnlm.antimine.common.level.viewmodel.GameEvent
 import dev.lucasnlm.antimine.common.level.viewmodel.GameViewModel
 import dev.lucasnlm.antimine.core.models.Analytics
@@ -28,7 +26,6 @@ import dev.lucasnlm.antimine.utils.BuildExt.androidSnowCone
 import dev.lucasnlm.antimine.utils.BundleExt.parcelable
 import dev.lucasnlm.external.AnalyticsManager
 import dev.lucasnlm.external.FeatureFlagManager
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.sharedViewModel
@@ -44,26 +41,23 @@ class GameOverDialogFragment : CommonGameDialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        arguments
-            ?.parcelable<CommonDialogState>(DIALOG_STATE)
-            ?.run {
-                dialogViewModel.sendEvent(
-                    EndGameDialogEvent.BuildCustomEndGame(
-                        gameResult =
-                            if (totalMines > 0) {
-                                gameResult
-                            } else {
-                                GameResult.GameOver
-                            },
-                        showContinueButton = showContinueButton,
-                        time = time,
-                        rightMines = rightMines,
-                        totalMines = totalMines,
-                        received = received,
-                        turn = turn,
-                    ),
-                )
-            }
+        arguments?.parcelable<CommonDialogState>(DIALOG_STATE)?.run {
+            dialogViewModel.sendEvent(
+                EndGameDialogEvent.BuildCustomEndGame(
+                    gameResult = if (totalMines > 0) {
+                        gameResult
+                    } else {
+                        GameResult.GameOver
+                    },
+                    showContinueButton = showContinueButton,
+                    time = time,
+                    rightMines = rightMines,
+                    totalMines = totalMines,
+                    received = received,
+                    turn = turn,
+                ),
+            )
+        }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -95,14 +89,12 @@ class GameOverDialogFragment : CommonGameDialogFragment() {
                             dismissAllowingStateLoss()
                         }
 
+                        // --- 核心修改：无条件复活点击事件 ---
                         continueGame.setOnClickListener {
                             analyticsManager.sentEvent(Analytics.ContinueGame)
-                            if (!isPremiumEnabled) {
-                                showAdsAndContinue()
-                            } else {
-                                gameViewModel.sendEvent(GameEvent.ContinueGame)
-                                dismissAllowingStateLoss()
-                            }
+                            // 直接发送复活指令，跳过广告和会员检查
+                            gameViewModel.sendEvent(GameEvent.ContinueGame)
+                            dismissAllowingStateLoss()
                         }
 
                         settings.setOnClickListener {
@@ -122,39 +114,26 @@ class GameOverDialogFragment : CommonGameDialogFragment() {
                             dismissAllowingStateLoss()
                         }
 
+                        // 广告栏位逻辑（可选保留，不影响复活）
                         if (featureFlagManager.isFoss && canRequestDonation) {
                             showDonationDialog(adFrame)
                         } else if (!isPremiumEnabled && featureFlagManager.isBannerAdEnabled) {
                             showAdBannerDialog(adFrame)
                         }
 
-                        if (!state.showTutorial && state.showContinueButton) {
-                            continueGame.isVisible = true
-                            if (!isPremiumEnabled) {
-                                continueGame.compoundDrawablePadding = 0
-                                continueGame.setCompoundDrawablesWithIntrinsicBounds(
-                                    R.drawable.watch_ads_icon,
-                                    0,
-                                    0,
-                                    0,
-                                )
-                            }
+                        // --- 核心修改：强制按钮 UI 表现 ---
+                        // 1. 强制显示复活按钮，隐藏倒计时
+                        continueGame.isVisible = true
+                        countdown.isVisible = false
 
-                            if (!isPremiumEnabled && featureFlagManager.showCountdownToContinue) {
-                                countdown.isVisible = true
-                                lifecycleScope.launch {
-                                    repeat(CONTINUE_COUNTDOWN_SECONDS) {
-                                        countdown.text = (CONTINUE_COUNTDOWN_SECONDS - it).toString()
-                                        delay(DateUtils.SECOND_IN_MILLIS)
-                                    }
-                                    countdown.isVisible = false
-                                    continueGame.isVisible = false
-                                }
-                            }
-                        } else {
-                            continueGame.isVisible = false
-                            countdown.isVisible = false
+                        // 2. 清除广告图标并设置自定义文本
+                        continueGame.apply {
+                            compoundDrawablePadding = 0
+                            setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+                            text = "原地复活" 
                         }
+
+                        // --- 已移除：原本在此处的倒计时隐藏逻辑 ---
 
                         if (state.showTutorial) {
                             tutorial.isVisible = true
@@ -171,7 +150,6 @@ class GameOverDialogFragment : CommonGameDialogFragment() {
                                 removeAds.apply {
                                     isVisible = true
                                     text = unlockLabel
-
                                     setOnClickListener {
                                         analyticsManager.sentEvent(Analytics.RemoveAds)
                                         lifecycleScope.launch {
