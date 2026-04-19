@@ -5,7 +5,7 @@ name: Android CI
 #     branches:
 #       - main
 on:
-  push:
+  push: 
     branches: [ main ]          # 每次 push 到 main 分支时运行
   pull_request:
     branches: [ main ]
